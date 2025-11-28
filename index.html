@@ -3,53 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Wine Farmer Run - Retro Edition</title>
+    <title>Wine Farmer - Retro Run</title>
     <style>
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #f7f7f7; /* Off-white background like Chrome Dino */
+            background-color: #f7f7f7; /* Chrome Dino off-white background */
             font-family: 'Courier New', Courier, monospace; /* Retro font */
             touch-action: none;
+            -webkit-user-select: none; /* Disable text selection on iPhone */
+            user-select: none;
         }
         canvas {
             display: block;
-            /* This turns the colorful emojis into Black & White retro sprites */
-            filter: grayscale(100%); 
+            /* 
+               MAGIC SAUCE: 
+               Grayscale removes color.
+               Contrast makes the grey emojis look like solid black ink.
+            */
+            filter: grayscale(100%) contrast(500%); 
         }
-        #instructions {
+        #ui-layer {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
+            pointer-events: none;
+        }
+        .retro-text {
             color: #535353;
             font-size: 24px;
             font-weight: bold;
-            pointer-events: none;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .blink {
+            animation: blinker 1s linear infinite;
+        }
+        @keyframes blinker {
+            50% { opacity: 0; }
         }
     </style>
 </head>
 <body>
 
-    <div id="instructions">PRESS SPACE TO JUMP</div>
+    <div id="ui-layer">
+        <div id="start-msg" class="retro-text blink">PRESS SPACE TO JUMP</div>
+        <div id="game-over-msg" class="retro-text" style="display:none;">
+            GAME OVER<br>
+            <span style="font-size:18px; display:block; margin-top:10px;">TAP TO RESTART</span>
+        </div>
+    </div>
+    
     <canvas id="gameCanvas"></canvas>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const instructions = document.getElementById('instructions');
+        const startMsg = document.getElementById('start-msg');
+        const gameOverMsg = document.getElementById('game-over-msg');
 
-        // Game Variables
-        let gameSpeed = 6; // Slightly faster start
+        // Game State
+        let gameSpeed = 8; // Starting speed
         let score = 0;
         let gameover = false;
+        let running = false; // Waiting for first input
         let frame = 0;
         
-        // PHYSICS TWEAK: Higher gravity + higher jump = Snappier response
-        let gravity = 1.5; 
-        let jumpStrength = 22; 
+        // Physics: High gravity + High jump = "Snappy" feel
+        const gravity = 1.8; 
+        const jumpStrength = 23; 
 
         function resizeCanvas() {
             canvas.width = window.innerWidth;
@@ -58,34 +83,36 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // The Farmer (Player)
+        // Player Object
         const player = {
             x: 50,
             y: 0, 
-            width: 40, // Adjusted hitbox width slightly
+            width: 40, 
             height: 50,
             dy: 0,
             grounded: false,
             emoji: "👨‍🌾",
             draw: function() {
-                ctx.fillStyle = "#535353"; // Dark Grey
-                ctx.font = "46px Arial"; // Size of emoji
+                ctx.font = "46px Arial"; 
                 ctx.fillText(this.emoji, this.x, this.y + this.height);
+                
+                // Debug Hitbox (Enable if you want to see the collision box)
+                // ctx.lineWidth = 1; ctx.strokeStyle = "black"; ctx.strokeRect(this.x, this.y, this.width, this.height);
             },
             update: function() {
-                // Jump Physics
+                // Gravity
                 if (!this.grounded) {
                     this.dy += gravity;
                     this.y += this.dy;
-                } else {
-                    this.dy = 0;
-                    this.grounded = true;
                 }
 
-                // Ground collision
-                if (this.y + this.height > canvas.height - 20) {
-                    this.y = canvas.height - 20 - this.height;
+                // Ground Floor Collision
+                if (this.y + this.height > canvas.height - 30) {
+                    this.y = canvas.height - 30 - this.height;
+                    this.dy = 0;
                     this.grounded = true;
+                } else {
+                    this.grounded = false;
                 }
 
                 this.draw();
@@ -94,7 +121,6 @@
                 if (this.grounded) {
                     this.dy = -jumpStrength;
                     this.grounded = false;
-                    instructions.style.display = 'none';
                 }
             }
         };
@@ -107,13 +133,13 @@
                 this.width = 25;
                 this.height = 40;
                 this.x = canvas.width;
-                this.y = canvas.height - 20 - this.height;
+                this.y = canvas.height - 30 - this.height;
                 this.emoji = "🍷";
                 this.passed = false;
             }
 
             draw() {
-                ctx.font = "34px Arial";
+                ctx.font = "36px Arial";
                 ctx.fillText(this.emoji, this.x, this.y + this.height);
             }
 
@@ -124,37 +150,41 @@
         }
 
         function handleObstacles() {
-            // Spawn logic
-            if (frame % Math.floor(1200 / (gameSpeed * 2)) === 0) {
+            // Spawn Logic: Randomize slightly so it's not perfectly rhythmic
+            // Spawns roughly every 90 frames at start
+            let spawnRate = Math.floor(1400 / gameSpeed);
+            if (frame % spawnRate === 0) {
                 obstacles.push(new Obstacle());
             }
 
             for (let i = 0; i < obstacles.length; i++) {
-                obstacles[i].update();
+                let obs = obstacles[i];
+                obs.update();
 
-                // Collision Detection (Tightened hitboxes for precision)
+                // Collision Detection
+                // Note: +15/-10 creates a tighter hitbox so you don't die on empty space
                 if (
-                    player.x + 15 < obstacles[i].x + obstacles[i].width &&
-                    player.x + player.width - 10 > obstacles[i].x &&
-                    player.y + 20 < obstacles[i].y + obstacles[i].height &&
-                    player.y + player.height > obstacles[i].y
+                    player.x + 10 < obs.x + obs.width &&
+                    player.x + player.width - 10 > obs.x &&
+                    player.y + 20 < obs.y + obs.height &&
+                    player.y + player.height > obs.y
                 ) {
-                    gameover = true;
-                    drawGameOverScreen();
+                    endGame();
                 }
 
-                // Score & Speed Logic
-                if (!obstacles[i].passed && obstacles[i].x + obstacles[i].width < player.x) {
-                    score += 25; // 25 POINTS PER JUMP
-                    obstacles[i].passed = true;
+                // Scoring: Check if obstacle is completely behind player
+                if (!obs.passed && obs.x + obs.width < player.x) {
+                    score += 25; // ADD 25 POINTS
+                    obs.passed = true;
                     
-                    // Cap speed
+                    // Increase difficulty
                     if(gameSpeed < 25) { 
-                        gameSpeed += 0.25; 
+                        gameSpeed += 0.2; 
                     }
                 }
 
-                if (obstacles[i].x + obstacles[i].width < 0) {
+                // Clean up off-screen obstacles
+                if (obs.x + obs.width < 0) {
                     obstacles.splice(i, 1);
                     i--;
                 }
@@ -162,10 +192,9 @@
         }
 
         function drawGround() {
-            // Simple Retro Line
             ctx.beginPath();
-            ctx.moveTo(0, canvas.height - 20);
-            ctx.lineTo(canvas.width, canvas.height - 20);
+            ctx.moveTo(0, canvas.height - 30);
+            ctx.lineTo(canvas.width, canvas.height - 30);
             ctx.strokeStyle = "#535353";
             ctx.lineWidth = 2;
             ctx.stroke();
@@ -173,30 +202,18 @@
 
         function drawScore() {
             ctx.fillStyle = "#535353";
-            ctx.font = "24px 'Courier New', Courier, monospace";
+            ctx.font = "bold 24px 'Courier New'";
             ctx.textAlign = "right";
-            // Pad score with zeros like retro games (e.g., 00125)
-            let scoreStr = score.toString().padStart(5, '0');
-            ctx.fillText("HI " + scoreStr, canvas.width - 20, 40);
-            ctx.textAlign = "left"; 
-        }
-
-        function drawGameOverScreen() {
-            ctx.fillStyle = "#535353";
-            ctx.textAlign = "center";
             
-            ctx.font = "30px 'Courier New'";
-            ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2 - 20);
-            
-            ctx.font = "20px 'Courier New'";
-            ctx.fillText("Score: " + score, canvas.width/2, canvas.height/2 + 20);
-            
-            ctx.fillText("Tap/Space to Restart", canvas.width/2, canvas.height/2 + 60);
+            // Format score to look like "00250"
+            let formattedScore = score.toString().padStart(5, '0');
+            ctx.fillText(formattedScore, canvas.width - 20, 40);
             
             ctx.textAlign = "left"; 
         }
 
         function animate() {
+            if (!running) return;
             if (gameover) return;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -210,42 +227,58 @@
             requestAnimationFrame(animate);
         }
 
-        // Inputs
-        function inputAction(e) {
-            // Keydown only triggers if not repeating (prevents machine-gun jumping if holding key)
-            if (e.type === 'keydown') {
-                 if (e.repeat) return;
-                 if (e.code !== 'Space' && e.code !== 'ArrowUp') return;
+        // Game Control
+        function startGame() {
+            if (!running) {
+                running = true;
+                startMsg.style.display = 'none';
+                animate();
             }
-            
-            if (gameover) {
-                resetGame();
-            } else {
-                player.jump();
-            }
+        }
+
+        function endGame() {
+            gameover = true;
+            gameOverMsg.style.display = 'block';
         }
 
         function resetGame() {
             gameover = false;
             score = 0;
-            gameSpeed = 6;
+            gameSpeed = 8;
             frame = 0;
             obstacles.length = 0;
-            instructions.style.display = "block";
-            instructions.innerText = "PRESS SPACE TO JUMP";
+            gameOverMsg.style.display = 'none';
+            
+            // Reset player pos
+            player.y = canvas.height - 30 - player.height;
+            player.dy = 0;
+            
             animate();
         }
 
-        window.addEventListener('keydown', inputAction);
-        window.addEventListener('touchstart', (e) => {
-            if (gameover) {
+        // Input Handling
+        function handleInput(e) {
+            if (e.type === 'keydown' && e.code !== 'Space' && e.code !== 'ArrowUp') return;
+            if (e.type === 'touchstart') e.preventDefault(); // Stop zoom
+
+            if (!running) {
+                startGame();
+                player.jump();
+            } else if (gameover) {
                 resetGame();
             } else {
                 player.jump();
             }
-        }, {passive: false});
+        }
 
-        animate();
+        window.addEventListener('keydown', handleInput);
+        window.addEventListener('touchstart', handleInput, {passive: false});
+
+        // Initial Render
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawGround();
+        player.y = canvas.height - 30 - player.height;
+        player.draw();
 
     </script>
 </body>
