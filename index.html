@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Wine Farmer - Final Fixed</title>
+    <title>Wine Farmer - Retro Edition</title>
     <style>
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #ffffff;
+            background-color: #f0f0f0; /* Slightly off-white for retro feel */
             font-family: 'Courier New', Courier, monospace;
             touch-action: none;
             -webkit-user-select: none;
@@ -24,7 +24,10 @@
             display: block;
             width: 100%;
             height: 100%;
-            image-rendering: pixelated;
+            object-fit: contain;
+            /* === THIS RESTORES THE BLACK & WHITE LOOK === */
+            /* High contrast makes the wine bottle visible even in grayscale */
+            filter: grayscale(100%) contrast(120%); 
         }
 
         #ui-layer {
@@ -39,7 +42,7 @@
         }
 
         .retro-text {
-            color: #000;
+            color: #333;
             font-size: 5vmin;
             font-weight: bold;
             text-transform: uppercase;
@@ -79,7 +82,7 @@
         let running = false;
         let gameover = false;
 
-        // Physics Constants
+        // Physics
         const gravity = 2200;
         const jumpStrength = 800;
         const groundY = 550; 
@@ -88,7 +91,7 @@
         let isHoldingJump = false;
         let lastTime = 0;
 
-        // Player Character
+        // Player
         const player = {
             x: 100,
             y: groundY,
@@ -102,7 +105,7 @@
                 ctx.font = "60px Arial";
                 ctx.textAlign = "left";
                 ctx.textBaseline = "bottom";
-                ctx.fillStyle = "black";
+                ctx.fillStyle = "#000";
                 ctx.fillText(this.emoji, this.x, this.y);
             },
             
@@ -135,23 +138,20 @@
 
         class Obstacle {
             constructor() {
-                this.w = 30; 
+                this.w = 40; 
                 this.h = 50; 
                 this.x = 800;
                 this.y = groundY;
+                this.emoji = "🍷"; // Using the emoji again
                 this.passed = false;
             }
 
             draw() {
-                ctx.fillStyle = "black";
-                
-                // Bottle body
-                ctx.fillRect(this.x, this.y - 35, this.w, 35);
-                
-                // Bottle neck
-                let neckW = 10;
-                let neckX = this.x + (this.w - neckW) / 2;
-                ctx.fillRect(neckX, this.y - 50, neckW, 15);
+                ctx.font = "50px Arial";
+                ctx.textAlign = "left";
+                ctx.textBaseline = "bottom";
+                ctx.fillStyle = "#000";
+                ctx.fillText(this.emoji, this.x, this.y);
             }
 
             update(dt) {
@@ -159,6 +159,7 @@
             }
         }
 
+        // Main Loop
         let obstacleTimer = 0;
 
         function update(dt) {
@@ -174,8 +175,8 @@
                 let obs = obstacles[i];
                 obs.update(dt);
 
-                // Collision detection
-                let margin = 10;
+                // Hitbox (Adjusted for Emoji shape)
+                let margin = 15;
                 if (
                     player.x + margin < obs.x + obs.w &&
                     player.x + player.width - margin > obs.x &&
@@ -185,14 +186,12 @@
                     endGame();
                 }
 
-                // Scoring
                 if (!obs.passed && obs.x + obs.w < player.x) {
                     score += 25;
                     obs.passed = true;
                     if (gameSpeed < 1000) gameSpeed += 15;
                 }
 
-                // Remove old obstacles
                 if (obs.x + obs.w < -50) {
                     obstacles.splice(i, 1);
                     i--;
@@ -209,20 +208,19 @@
             ctx.beginPath();
             ctx.moveTo(0, groundY);
             ctx.lineTo(canvas.width, groundY);
-            ctx.strokeStyle = "black";
+            ctx.strokeStyle = "#333";
             ctx.lineWidth = 4;
             ctx.stroke();
 
-            // Player
             player.draw();
 
-            // 👉 Draw obstacles HERE (the fix)
+            // Draw Obstacles (Wine Bottles)
             for (let obs of obstacles) {
                 obs.draw();
             }
 
             // Score
-            ctx.fillStyle = "black";
+            ctx.fillStyle = "#333";
             ctx.font = "bold 30px 'Courier New'";
             ctx.textAlign = "right";
             ctx.textBaseline = "top";
@@ -243,7 +241,7 @@
             }
         }
 
-        // Game State Functions
+        // Logic
         function startGame() {
             if (!running) {
                 running = true;
@@ -272,7 +270,7 @@
             requestAnimationFrame(animate);
         }
 
-        // Input
+        // Inputs
         function handleStart(e) {
             if (e.type === 'keydown' && e.code !== 'Space' && e.code !== 'ArrowUp') return;
             if (e.type === 'touchstart' || e.code === 'Space' || e.code === 'ArrowUp') {
