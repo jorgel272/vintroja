@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Wine Farmer - Visible Fix</title>
+    <title>Wine Farmer - High Contrast</title>
     <style>
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #f7f7f7; 
+            background-color: #ffffff; /* Pure white background */
             font-family: 'Courier New', Courier, monospace;
             touch-action: none;
             -webkit-user-select: none;
@@ -25,8 +25,7 @@
             width: 100%;
             height: 100%;
             object-fit: contain; 
-            /* Keeps the retro look but ensures dark objects stay dark */
-            filter: grayscale(100%) contrast(200%); 
+            /* REMOVED FILTERS to ensure colors are exact */
         }
 
         #ui-layer {
@@ -41,13 +40,12 @@
         }
 
         .retro-text {
-            color: #333;
+            color: #000; /* Pure Black Text */
             font-size: 5vmin;
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 3px;
             margin-bottom: 10px;
-            text-shadow: 2px 2px 0px #fff;
         }
 
         .blink {
@@ -96,7 +94,7 @@
             x: 100,
             y: groundY,
             width: 40, 
-            height: 60, // Hitbox height
+            height: 60, 
             dy: 0,
             grounded: false,
             emoji: "👨‍🌾",
@@ -105,11 +103,8 @@
                 ctx.font = "60px Arial";
                 ctx.textAlign = "left";
                 ctx.textBaseline = "bottom"; 
-                ctx.fillStyle = "#000"; // Ensure black color
+                ctx.fillStyle = "black"; // Force Black
                 ctx.fillText(this.emoji, this.x, this.y);
-                
-                // Un-comment to see hitbox if needed:
-                // ctx.strokeStyle = "red"; ctx.strokeRect(this.x, this.y - this.height, this.width, this.height);
             },
             
             update: function(dt) {
@@ -141,26 +136,25 @@
 
         class Obstacle {
             constructor() {
-                this.w = 30; // Width of bottle
-                this.h = 50; // Total height
+                this.w = 30; 
+                this.h = 50; 
                 this.x = 800; 
                 this.y = groundY; 
                 this.passed = false;
             }
 
             draw() {
-                ctx.fillStyle = "#222"; // Very dark grey (almost black)
+                // FORCE PURE BLACK
+                ctx.fillStyle = "#000000"; 
                 
-                // 1. Draw Bottle Body (Rectangle)
-                // x, y, width, height. Note: y is bottom, so we subtract height
-                let bodyHeight = 35;
-                ctx.fillRect(this.x, this.y - bodyHeight, this.w, bodyHeight);
+                // Draw Bottle Body (Bottom part)
+                ctx.fillRect(this.x, this.y - 30, this.w, 30);
 
-                // 2. Draw Bottle Neck (Thinner Rectangle on top)
-                let neckWidth = 12;
-                let neckHeight = 15;
-                let neckX = this.x + (this.w - neckWidth) / 2; // Center it
-                ctx.fillRect(neckX, this.y - this.h, neckWidth, neckHeight);
+                // Draw Bottle Neck (Top part)
+                // Centered on the body
+                let neckW = 10;
+                let neckX = this.x + (this.w - neckW) / 2;
+                ctx.fillRect(neckX, this.y - 50, neckW, 20);
             }
 
             update(dt) {
@@ -185,9 +179,8 @@
                 obs.update(dt);
                 obs.draw();
 
-                // Hitbox Collision
+                // Hitbox
                 let margin = 10; 
-                
                 if (
                     player.x + margin < obs.x + obs.w &&
                     player.x + player.width - margin > obs.x &&
@@ -215,18 +208,18 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw Floor
+            // Draw Ground Line (Black)
             ctx.beginPath();
             ctx.moveTo(0, groundY);
             ctx.lineTo(canvas.width, groundY);
-            ctx.strokeStyle = "#444";
+            ctx.strokeStyle = "#000000"; 
             ctx.lineWidth = 4;
             ctx.stroke();
 
             player.draw();
 
-            // Score
-            ctx.fillStyle = "#333";
+            // Score (Black)
+            ctx.fillStyle = "#000000";
             ctx.font = "bold 30px 'Courier New'";
             ctx.textAlign = "right";
             ctx.textBaseline = "top";
@@ -247,7 +240,7 @@
             }
         }
 
-        // === GAME STATE ===
+        // === STATE ===
         function startGame() {
             if (!running) {
                 running = true;
