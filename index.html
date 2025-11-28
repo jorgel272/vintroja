@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Wine Farmer - Smooth & Responsive</title>
+    <meta name="theme-color" content="#f7f7f7">
+    <title>Wine Farmer - Optimized</title>
     <style>
         body {
             margin: 0;
@@ -18,8 +19,8 @@
         }
         canvas {
             display: block;
-            /* Keeps the Retro Black & White look */
-            filter: grayscale(100%) contrast(500%); 
+            width: 100%;
+            height: 100%;
         }
         #ui-layer {
             position: absolute;
@@ -32,12 +33,13 @@
             z-index: 10;
         }
         .retro-text {
-            color: #535353;
+            color: #333;
             font-size: 24px;
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 3px;
             margin-bottom: 10px;
+            text-shadow: 2px 2px 0px #ddd;
         }
         .blink {
             animation: blinker 1s step-end infinite;
@@ -50,7 +52,7 @@
 <body>
 
     <div id="ui-layer">
-        <div id="start-msg" class="retro-text blink">PRESS SPACE</div>
+        <div id="start-msg" class="retro-text blink">TAP TO START</div>
         <div id="game-over-msg" class="retro-text" style="display:none;">
             GAME OVER<br>
             <span style="font-size:16px; display:block; margin-top:15px;">TAP TO RETRY</span>
@@ -61,31 +63,38 @@
 
     <script>
         const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { alpha: false }); // Optimization: Disable alpha if not needed for background
         const startMsg = document.getElementById('start-msg');
         const gameOverMsg = document.getElementById('game-over-msg');
 
-        // Game Configuration
-        let gameSpeed = 7; 
-        let score = 0;
-        let gameover = false;
-        let running = false; 
-        let frame = 0;
-        
-        // === INPUT BUFFERING ===
-        // This is the magic fix. We store the jump command for a few frames.
-        let jumpBuffer = 0; 
-
-        // Physics
-        const gravity = 1.5; 
-        const jumpStrength = 20; 
-
+        // === RESIZING ===
+        let scaleRatio = 1;
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
+            // Scale graphics slightly on larger screens so it doesn't look tiny
+            scaleRatio = Math.min(canvas.width / 400, 1.5); 
         }
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
+
+        // === GAME VARIABLES ===
+        let gameSpeed = 350; // Pixels per second
+        let score = 0;
+        let gameover = false;
+        let running = false; 
+        
+        // Physics
+        // Gravity needs to be strong enough to pull down quickly
+        const gravity = 2500; 
+        const jumpStrength = 850; 
+        
+        // Input Logic
+        let jumpBuffer = 0; // Remembers jump press for a split second
+        let isHoldingJump = false; // Tracks if user is holding the button
+
+        // Time Management (The Smoothness Fix)
+        let lastTime = 0;
 
         // Player Character
         const player = {
@@ -96,20 +105,26 @@
             dy: 0,
             grounded: false,
             emoji: "👨‍🌾",
+            
             draw: function() {
-                ctx.font = "46px Arial"; 
-                ctx.fillText(this.emoji, this.x, this.y + this.height);
+                ctx.font = `${46 * scaleRatio}px Arial`; 
+                // Draw relative to scaled size
+                ctx.fillText(this.emoji, this.x, this.y + (this.height * scaleRatio));
+                
+                // Debug Hitbox (Uncomment to see collision box)
+                // ctx.strokeStyle = "red"; ctx.strokeRect(this.x, this.y, this.width * scaleRatio, this.height * scaleRatio);
             },
-            update: function() {
+            
+            update: function(dt) {
                 // Apply Gravity
-                if (!this.grounded) {
-                    this.dy += gravity;
-                    this.y += this.dy;
-                }
+                this.dy += gravity * dt;
+                this.y += this.dy * dt;
 
                 // Ground Detection
-                if (this.y + this.height > canvas.height - 30) {
-                    this.y = canvas.height - 30 - this.height;
+                let groundLevel = canvas.height - (30 * scaleRatio) - (this.height * scaleRatio);
+                
+                if (this.y > groundLevel) {
+                    this.y = groundLevel;
                     this.dy = 0;
                     this.grounded = true;
                 } else {
@@ -117,14 +132,19 @@
                 }
 
                 // === JUMP LOGIC ===
-                // Check if we have a buffered jump command waiting AND we are on the ground
+                // Buffer Check: Execute jump if buffered and grounded
                 if (jumpBuffer > 0 && this.grounded) {
                     this.jump();
-                    jumpBuffer = 0; // Use up the buffer
+                    jumpBuffer = 0; 
                 }
 
-                this.draw();
+                // Variable Jump Height:
+                // If moving up (jumping) AND not holding button, cut upward momentum
+                if (this.dy < 0 && !isHoldingJump) {
+                    this.dy += gravity * dt * 1.5; // Apply extra gravity to cut jump short
+                }
             },
+            
             jump: function() {
                 this.dy = -jumpStrength;
                 this.grounded = false;
@@ -136,100 +156,134 @@
 
         class Obstacle {
             constructor() {
-                this.width = 25;
-                this.height = 40;
+                this.w = 25;
+                this.h = 40;
                 this.x = canvas.width;
-                this.y = canvas.height - 30 - this.height;
+                // Place on ground
+                this.y = canvas.height - (30 * scaleRatio) - (this.h * scaleRatio);
                 this.emoji = "🍷";
                 this.passed = false;
             }
 
             draw() {
-                ctx.font = "36px Arial";
-                ctx.fillText(this.emoji, this.x, this.y + this.height);
-            }
+                ctx.font = `${36 * scaleRatio}px Arial`;
+                ctx.fillText(this.emoji, this.x, this.y + (this.h * scaleRatio));
+                
+                // Debug Hitbox
+                // ctx.strokeStyle = "blue"; ctx.strokeRect(this.x, this.y, this.w * scaleRatio, this.h * scaleRatio);
+            },
 
-            update() {
-                this.x -= gameSpeed;
-                this.draw();
+            update(dt) {
+                this.x -= gameSpeed * dt;
             }
         }
 
-        function handleObstacles() {
-            let spawnRate = Math.floor(1100 / gameSpeed);
-            if (frame % spawnRate === 0) {
+        // === GAME LOOP ===
+        let obstacleTimer = 0;
+        let obstacleInterval = 1.8; // Seconds between obstacles
+
+        function update(dt) {
+            player.update(dt);
+
+            // Obstacle Spawning
+            obstacleTimer -= dt;
+            if (obstacleTimer <= 0) {
                 obstacles.push(new Obstacle());
+                // Randomize next spawn slightly
+                obstacleInterval = (Math.random() * 0.5) + (1100 / gameSpeed); 
+                obstacleTimer = obstacleInterval;
             }
 
+            // Obstacle Logic
             for (let i = 0; i < obstacles.length; i++) {
                 let obs = obstacles[i];
-                obs.update();
+                obs.update(dt);
+                obs.draw();
 
-                // Collision
+                // Hitbox Calculation (Scaled)
+                let pW = player.width * scaleRatio;
+                let pH = player.height * scaleRatio;
+                let oW = obs.w * scaleRatio;
+                let oH = obs.h * scaleRatio;
+
+                // Forgiving Collision (Shrink hitbox slightly for fairness)
+                let hitMargin = 10 * scaleRatio; 
+
                 if (
-                    player.x + 15 < obs.x + obs.width &&
-                    player.x + player.width - 10 > obs.x &&
-                    player.y + 20 < obs.y + obs.height &&
-                    player.y + player.height > obs.y
+                    player.x + hitMargin < obs.x + oW &&
+                    player.x + pW - hitMargin > obs.x &&
+                    player.y + hitMargin < obs.y + oH &&
+                    player.y + pH > obs.y
                 ) {
                     endGame();
                 }
 
-                // Scoring: 25 Points
-                if (!obs.passed && obs.x + obs.width < player.x) {
+                // Scoring
+                if (!obs.passed && obs.x + oW < player.x) {
                     score += 25; 
                     obs.passed = true;
-                    if(gameSpeed < 18) gameSpeed += 0.2; 
+                    // Increase speed capping at 900
+                    if(gameSpeed < 900) gameSpeed += 10; 
                 }
 
-                if (obs.x + obs.width < 0) {
+                // Cleanup
+                if (obs.x + oW < 0) {
                     obstacles.splice(i, 1);
                     i--;
                 }
             }
+
+            // Decrease Buffer timer (Time based now, not frame based)
+            if (jumpBuffer > 0) jumpBuffer -= dt;
         }
 
-        function drawGround() {
+        function draw() {
+            // Draw Background
+            ctx.fillStyle = "#f7f7f7";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw Ground
             ctx.beginPath();
-            ctx.moveTo(0, canvas.height - 30);
-            ctx.lineTo(canvas.width, canvas.height - 30);
+            ctx.moveTo(0, canvas.height - (30 * scaleRatio));
+            ctx.lineTo(canvas.width, canvas.height - (30 * scaleRatio));
             ctx.strokeStyle = "#535353";
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 4;
             ctx.stroke();
-        }
 
-        function drawScore() {
+            player.draw();
+            
+            // Draw Score
             ctx.fillStyle = "#535353";
             ctx.font = "bold 24px 'Courier New'";
             ctx.textAlign = "right";
-            let formattedScore = score.toString().padStart(5, '0');
-            ctx.fillText(formattedScore, canvas.width - 20, 40);
+            let formattedScore = Math.floor(score).toString().padStart(5, '0');
+            ctx.fillText(formattedScore, canvas.width - 20, 50);
             ctx.textAlign = "left"; 
         }
 
-        function animate() {
+        function animate(timestamp) {
             if (!running) return;
-            if (gameover) return;
 
-            // Decrease Jump Buffer timer every frame
-            if (jumpBuffer > 0) jumpBuffer--;
+            // Calculate Delta Time (in seconds)
+            // Cap it at 0.1s to prevent huge jumps if browser tab hangs
+            let dt = (timestamp - lastTime) / 1000;
+            if (dt > 0.1) dt = 0.1; 
+            lastTime = timestamp;
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            drawGround();
-            player.update();
-            handleObstacles();
-            drawScore();
-            
-            frame++;
-            requestAnimationFrame(animate);
+            if (!gameover) {
+                update(dt);
+                draw();
+                requestAnimationFrame(animate);
+            }
         }
 
+        // === STATE MANAGEMENT ===
         function startGame() {
             if (!running) {
                 running = true;
                 startMsg.style.display = 'none';
-                animate();
+                lastTime = performance.now();
+                animate(performance.now());
             }
         }
 
@@ -241,55 +295,58 @@
         function resetGame() {
             gameover = false;
             score = 0;
-            gameSpeed = 7;
-            frame = 0;
+            gameSpeed = 350;
+            obstacleTimer = 0;
             obstacles.length = 0;
             gameOverMsg.style.display = 'none';
             
-            player.y = canvas.height - 30 - player.height;
+            player.y = canvas.height - (30 * scaleRatio) - (player.height * scaleRatio);
             player.dy = 0;
             player.grounded = true;
             
-            animate();
+            lastTime = performance.now();
+            animate(performance.now());
         }
 
-        function handleInput(e) {
-            // Logic for both Touch and Keyboard
-            let isJumpAction = false;
+        // === INPUT HANDLER ===
+        function handleStart(e) {
+            if(e.type === 'touchstart') e.preventDefault(); 
+            if(e.type === 'keydown' && e.code !== 'Space' && e.code !== 'ArrowUp') return;
+            if(e.type === 'keydown') e.preventDefault();
 
-            if (e.type === 'keydown' && (e.code === 'Space' || e.code === 'ArrowUp')) {
-                isJumpAction = true;
-                e.preventDefault(); // Prevents scrolling lag
-            }
-            if (e.type === 'touchstart') {
-                isJumpAction = true;
-                e.preventDefault(); // Prevents touch lag
-            }
-
-            if (!isJumpAction) return;
+            isHoldingJump = true;
 
             if (!running) {
                 startGame();
-                // Initial jump
-                jumpBuffer = 10;
+                jumpBuffer = 0.2; // 0.2 seconds buffer
             } else if (gameover) {
                 resetGame();
             } else {
-                // INSTEAD OF JUMPING DIRECTLY, WE BUFFER THE INPUT
-                // This means: "The player wants to jump. Remember this for 10 frames."
-                jumpBuffer = 10; 
+                jumpBuffer = 0.2; 
             }
         }
 
-        document.addEventListener('keydown', handleInput);
-        document.addEventListener('touchstart', handleInput, {passive: false});
+        function handleEnd(e) {
+            if(e.type === 'touchend') e.preventDefault();
+            if(e.type === 'keyup' && e.code !== 'Space' && e.code !== 'ArrowUp') return;
+            
+            isHoldingJump = false;
+        }
 
-        // Initial Render
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawGround();
-        player.y = canvas.height - 30 - player.height;
-        player.draw();
+        document.addEventListener('keydown', handleStart);
+        document.addEventListener('keyup', handleEnd);
+        document.addEventListener('touchstart', handleStart, {passive: false});
+        document.addEventListener('touchend', handleEnd, {passive: false});
 
+        // Initial Draw
+        ctx.fillStyle = "#f7f7f7";
+        ctx.fillRect(0,0,canvas.width, canvas.height);
+        // Fake draw to show character before start
+        ctx.fillStyle = "#333";
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height - 30);
+        ctx.lineTo(canvas.width, canvas.height - 30);
+        ctx.stroke();
     </script>
 </body>
 </html>
