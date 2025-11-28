@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Wine Farmer - Retro Fixed</title>
+    <title>Wine Farmer - Visible Fix</title>
     <style>
         body {
             margin: 0;
@@ -11,7 +11,7 @@
             overflow: hidden;
             background-color: #f7f7f7; 
             font-family: 'Courier New', Courier, monospace;
-            touch-action: none; /* Stops zooming/scrolling on mobile */
+            touch-action: none;
             -webkit-user-select: none;
             user-select: none;
             display: flex;
@@ -21,15 +21,12 @@
         }
 
         canvas {
-            /* This ensures the game scales to fit the screen while keeping aspect ratio */
             display: block;
             width: 100%;
             height: 100%;
             object-fit: contain; 
-            
-            /* === THE RETRO FILTER IS BACK === */
-            /* Turns emojis black & white and high contrast */
-            filter: grayscale(100%) contrast(500%); 
+            /* Keeps the retro look but ensures dark objects stay dark */
+            filter: grayscale(100%) contrast(200%); 
         }
 
         #ui-layer {
@@ -38,14 +35,14 @@
             left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
-            pointer-events: none; /* Allows clicks to pass through to the game */
+            pointer-events: none;
             width: 100%;
             z-index: 10;
         }
 
         .retro-text {
             color: #333;
-            font-size: 5vmin; /* Scales text with screen size */
+            font-size: 5vmin;
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 3px;
@@ -80,8 +77,7 @@
         const startMsg = document.getElementById('start-msg');
         const gameOverMsg = document.getElementById('game-over-msg');
 
-        // === GAME CONFIG (Fixed numbers, no complex math) ===
-        let gameSpeed = 350; // Pixels per second
+        let gameSpeed = 350; 
         let score = 0;
         let running = false;
         let gameover = false;
@@ -89,9 +85,8 @@
         // Physics
         const gravity = 2000;
         const jumpStrength = 800;
-        const groundY = 550; // The floor Y position (internal coordinates)
+        const groundY = 550; 
         
-        // Input
         let jumpBuffer = 0;
         let isHoldingJump = false;
         let lastTime = 0;
@@ -100,8 +95,8 @@
         const player = {
             x: 100,
             y: groundY,
-            width: 50,
-            height: 60,
+            width: 40, 
+            height: 60, // Hitbox height
             dy: 0,
             grounded: false,
             emoji: "👨‍🌾",
@@ -109,16 +104,18 @@
             draw: function() {
                 ctx.font = "60px Arial";
                 ctx.textAlign = "left";
-                ctx.textBaseline = "bottom"; // Draws from the feet up
+                ctx.textBaseline = "bottom"; 
+                ctx.fillStyle = "#000"; // Ensure black color
                 ctx.fillText(this.emoji, this.x, this.y);
+                
+                // Un-comment to see hitbox if needed:
+                // ctx.strokeStyle = "red"; ctx.strokeRect(this.x, this.y - this.height, this.width, this.height);
             },
             
             update: function(dt) {
-                // Gravity
                 this.dy += gravity * dt;
                 this.y += this.dy * dt;
 
-                // Ground Collision
                 if (this.y > groundY) {
                     this.y = groundY;
                     this.dy = 0;
@@ -127,14 +124,12 @@
                     this.grounded = false;
                 }
 
-                // Jump Execution
                 if (jumpBuffer > 0 && this.grounded) {
                     this.dy = -jumpStrength;
                     this.grounded = false;
                     jumpBuffer = 0;
                 }
 
-                // Variable Jump Height (Cut jump if button released)
                 if (this.dy < 0 && !isHoldingJump) {
                     this.dy += gravity * dt * 2.5; 
                 }
@@ -146,19 +141,26 @@
 
         class Obstacle {
             constructor() {
-                this.w = 40;
-                this.h = 50;
-                this.x = 800; // Start at right edge of internal canvas
+                this.w = 30; // Width of bottle
+                this.h = 50; // Total height
+                this.x = 800; 
                 this.y = groundY; 
-                this.emoji = "🍷";
                 this.passed = false;
             }
 
             draw() {
-                ctx.font = "50px Arial";
-                ctx.textAlign = "left";
-                ctx.textBaseline = "bottom";
-                ctx.fillText(this.emoji, this.x, this.y);
+                ctx.fillStyle = "#222"; // Very dark grey (almost black)
+                
+                // 1. Draw Bottle Body (Rectangle)
+                // x, y, width, height. Note: y is bottom, so we subtract height
+                let bodyHeight = 35;
+                ctx.fillRect(this.x, this.y - bodyHeight, this.w, bodyHeight);
+
+                // 2. Draw Bottle Neck (Thinner Rectangle on top)
+                let neckWidth = 12;
+                let neckHeight = 15;
+                let neckX = this.x + (this.w - neckWidth) / 2; // Center it
+                ctx.fillRect(neckX, this.y - this.h, neckWidth, neckHeight);
             }
 
             update(dt) {
@@ -172,25 +174,20 @@
         function update(dt) {
             player.update(dt);
 
-            // Spawn Logic
             obstacleTimer -= dt;
             if (obstacleTimer <= 0) {
                 obstacles.push(new Obstacle());
-                // Random time between 1.5s and 2.5s
                 obstacleTimer = 1.5 + Math.random(); 
             }
 
-            // Obstacle Logic
             for (let i = 0; i < obstacles.length; i++) {
                 let obs = obstacles[i];
                 obs.update(dt);
                 obs.draw();
 
-                // Hitbox variables (Internal Coordinates)
-                // We shrink the hitbox slightly (margin) so it feels fair
-                let margin = 15; 
+                // Hitbox Collision
+                let margin = 10; 
                 
-                // Check Collision
                 if (
                     player.x + margin < obs.x + obs.w &&
                     player.x + player.width - margin > obs.x &&
@@ -200,14 +197,12 @@
                     endGame();
                 }
 
-                // Score
                 if (!obs.passed && obs.x + obs.w < player.x) {
                     score += 25;
                     obs.passed = true;
                     if (gameSpeed < 1000) gameSpeed += 15;
                 }
 
-                // Remove off-screen
                 if (obs.x + obs.w < -50) {
                     obstacles.splice(i, 1);
                     i--;
@@ -218,10 +213,9 @@
         }
 
         function draw() {
-            // Clear entire internal canvas (800x600)
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw Floor Line
+            // Draw Floor
             ctx.beginPath();
             ctx.moveTo(0, groundY);
             ctx.lineTo(canvas.width, groundY);
@@ -231,7 +225,7 @@
 
             player.draw();
 
-            // Draw Score
+            // Score
             ctx.fillStyle = "#333";
             ctx.font = "bold 30px 'Courier New'";
             ctx.textAlign = "right";
@@ -242,9 +236,8 @@
 
         function animate(timestamp) {
             if (!running) return;
-
             let dt = (timestamp - lastTime) / 1000;
-            if (dt > 0.1) dt = 0.1; // Safety cap
+            if (dt > 0.1) dt = 0.1; 
             lastTime = timestamp;
 
             if (!gameover) {
@@ -254,8 +247,7 @@
             }
         }
 
-        // === GAME STATE FUNCTIONS ===
-
+        // === GAME STATE ===
         function startGame() {
             if (!running) {
                 running = true;
@@ -277,22 +269,16 @@
             obstacleTimer = 0;
             obstacles.length = 0;
             gameOverMsg.style.display = 'none';
-            
             player.y = groundY;
             player.dy = 0;
             player.grounded = true;
-            
             lastTime = performance.now();
             requestAnimationFrame(animate);
         }
 
-        // === INPUTS (Works for Mouse & Touch) ===
-
+        // === INPUTS ===
         function handleStart(e) {
-            // Filter keys
             if (e.type === 'keydown' && e.code !== 'Space' && e.code !== 'ArrowUp') return;
-            
-            // Prevent scrolling on space/touch
             if (e.type === 'touchstart' || e.code === 'Space' || e.code === 'ArrowUp') {
                 e.preventDefault();
             }
@@ -313,16 +299,13 @@
             isHoldingJump = false;
         }
 
-        // Event Listeners
         window.addEventListener('mousedown', handleStart);
         window.addEventListener('touchstart', handleStart, {passive: false});
         window.addEventListener('keydown', handleStart);
-
         window.addEventListener('mouseup', handleEnd);
         window.addEventListener('touchend', handleEnd);
         window.addEventListener('keyup', handleEnd);
 
-        // Initial Render
         draw();
 
     </script>
