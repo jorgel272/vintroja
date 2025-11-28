@@ -3,18 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Wine Farmer Run</title>
+    <title>Wine Farmer Run - Retro Edition</title>
     <style>
         body {
             margin: 0;
             padding: 0;
-            overflow: hidden; /* Prevents scrolling on mobile */
-            background-color: #87CEEB; /* Sky blue background */
-            font-family: sans-serif;
-            touch-action: none; /* Disables double-tap zoom */
+            overflow: hidden;
+            background-color: #f7f7f7; /* Off-white background like Chrome Dino */
+            font-family: 'Courier New', Courier, monospace; /* Retro font */
+            touch-action: none;
         }
         canvas {
             display: block;
+            /* This turns the colorful emojis into Black & White retro sprites */
+            filter: grayscale(100%); 
         }
         #instructions {
             position: absolute;
@@ -22,17 +24,16 @@
             left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
-            color: white;
-            font-size: 20px;
+            color: #535353;
+            font-size: 24px;
             font-weight: bold;
-            text-shadow: 2px 2px 4px #000000;
-            pointer-events: none; /* Let clicks pass through to canvas */
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
 
-    <div id="instructions">Tap screen or Spacebar to Jump</div>
+    <div id="instructions">PRESS SPACE TO JUMP</div>
     <canvas id="gameCanvas"></canvas>
 
     <script>
@@ -41,13 +42,15 @@
         const instructions = document.getElementById('instructions');
 
         // Game Variables
-        let gameSpeed = 5;
+        let gameSpeed = 6; // Slightly faster start
         let score = 0;
         let gameover = false;
         let frame = 0;
-        let gravity = 0.6;
+        
+        // PHYSICS TWEAK: Higher gravity + higher jump = Snappier response
+        let gravity = 1.5; 
+        let jumpStrength = 22; 
 
-        // Resize canvas to fit mobile screen dynamically
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
@@ -59,14 +62,14 @@
         const player = {
             x: 50,
             y: 0, 
-            width: 50,
+            width: 40, // Adjusted hitbox width slightly
             height: 50,
             dy: 0,
-            jumpStrength: 12,
             grounded: false,
-            emoji: "👨‍🌾", // Farmer Character
+            emoji: "👨‍🌾",
             draw: function() {
-                ctx.font = "40px Arial";
+                ctx.fillStyle = "#535353"; // Dark Grey
+                ctx.font = "46px Arial"; // Size of emoji
                 ctx.fillText(this.emoji, this.x, this.y + this.height);
             },
             update: function() {
@@ -76,42 +79,41 @@
                     this.y += this.dy;
                 } else {
                     this.dy = 0;
+                    this.grounded = true;
                 }
 
                 // Ground collision
-                if (this.y + this.height > canvas.height - 50) {
-                    this.y = canvas.height - 50 - this.height;
+                if (this.y + this.height > canvas.height - 20) {
+                    this.y = canvas.height - 20 - this.height;
                     this.grounded = true;
-                } else {
-                    this.grounded = false;
                 }
 
                 this.draw();
             },
             jump: function() {
                 if (this.grounded) {
-                    this.dy = -this.jumpStrength;
+                    this.dy = -jumpStrength;
                     this.grounded = false;
                     instructions.style.display = 'none';
                 }
             }
         };
 
-        // Obstacles (Wine Glasses)
+        // Obstacles
         const obstacles = [];
 
         class Obstacle {
             constructor() {
-                this.width = 30;
+                this.width = 25;
                 this.height = 40;
                 this.x = canvas.width;
-                this.y = canvas.height - 50 - this.height;
-                this.emoji = "🍷"; // RED WINE GLASS
+                this.y = canvas.height - 20 - this.height;
+                this.emoji = "🍷";
                 this.passed = false;
             }
 
             draw() {
-                ctx.font = "30px Arial";
+                ctx.font = "34px Arial";
                 ctx.fillText(this.emoji, this.x, this.y + this.height);
             }
 
@@ -122,19 +124,19 @@
         }
 
         function handleObstacles() {
-            // Spawn obstacles based on game speed
-            if (frame % Math.floor(1500 / (gameSpeed * 2)) === 0) {
+            // Spawn logic
+            if (frame % Math.floor(1200 / (gameSpeed * 2)) === 0) {
                 obstacles.push(new Obstacle());
             }
 
             for (let i = 0; i < obstacles.length; i++) {
                 obstacles[i].update();
 
-                // Collision Detection (With small buffer for better gameplay)
+                // Collision Detection (Tightened hitboxes for precision)
                 if (
-                    player.x + 10 < obstacles[i].x + obstacles[i].width &&
+                    player.x + 15 < obstacles[i].x + obstacles[i].width &&
                     player.x + player.width - 10 > obstacles[i].x &&
-                    player.y + 10 < obstacles[i].y + obstacles[i].height &&
+                    player.y + 20 < obstacles[i].y + obstacles[i].height &&
                     player.y + player.height > obstacles[i].y
                 ) {
                     gameover = true;
@@ -143,16 +145,15 @@
 
                 // Score & Speed Logic
                 if (!obstacles[i].passed && obstacles[i].x + obstacles[i].width < player.x) {
-                    score++;
+                    score += 25; // 25 POINTS PER JUMP
                     obstacles[i].passed = true;
                     
-                    // Increase speed every time you jump a bottle
-                    if(gameSpeed < 20) { 
+                    // Cap speed
+                    if(gameSpeed < 25) { 
                         gameSpeed += 0.25; 
                     }
                 }
 
-                // Remove off-screen obstacles to save memory
                 if (obstacles[i].x + obstacles[i].width < 0) {
                     obstacles.splice(i, 1);
                     i--;
@@ -161,36 +162,36 @@
         }
 
         function drawGround() {
-            ctx.fillStyle = "#5D4037"; // Brown earth
-            ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
-            
-            ctx.fillStyle = "#388E3C"; // Green grass
-            ctx.fillRect(0, canvas.height - 55, canvas.width, 5);
+            // Simple Retro Line
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height - 20);
+            ctx.lineTo(canvas.width, canvas.height - 20);
+            ctx.strokeStyle = "#535353";
+            ctx.lineWidth = 2;
+            ctx.stroke();
         }
 
         function drawScore() {
-            ctx.fillStyle = "black";
-            ctx.font = "bold 24px Arial";
+            ctx.fillStyle = "#535353";
+            ctx.font = "24px 'Courier New', Courier, monospace";
             ctx.textAlign = "right";
-            ctx.fillText("Score: " + score, canvas.width - 20, 40);
+            // Pad score with zeros like retro games (e.g., 00125)
+            let scoreStr = score.toString().padStart(5, '0');
+            ctx.fillText("HI " + scoreStr, canvas.width - 20, 40);
             ctx.textAlign = "left"; 
         }
 
         function drawGameOverScreen() {
-            ctx.fillStyle = "rgba(0,0,0,0.5)";
-            ctx.fillRect(0,0, canvas.width, canvas.height);
-            
-            ctx.fillStyle = "white";
+            ctx.fillStyle = "#535353";
             ctx.textAlign = "center";
             
-            ctx.font = "30px Arial";
-            ctx.fillText("Game Over!", canvas.width/2, canvas.height/2 - 10);
+            ctx.font = "30px 'Courier New'";
+            ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2 - 20);
             
-            ctx.font = "20px Arial";
-            ctx.fillText("Final Score: " + score, canvas.width/2, canvas.height/2 + 25);
+            ctx.font = "20px 'Courier New'";
+            ctx.fillText("Score: " + score, canvas.width/2, canvas.height/2 + 20);
             
-            ctx.font = "16px Arial";
-            ctx.fillText("Tap to Restart", canvas.width/2, canvas.height/2 + 60);
+            ctx.fillText("Tap/Space to Restart", canvas.width/2, canvas.height/2 + 60);
             
             ctx.textAlign = "left"; 
         }
@@ -211,8 +212,11 @@
 
         // Inputs
         function inputAction(e) {
-            // Allow Space or ArrowUp
-            if (e.type === 'keydown' && e.code !== 'Space' && e.code !== 'ArrowUp') return;
+            // Keydown only triggers if not repeating (prevents machine-gun jumping if holding key)
+            if (e.type === 'keydown') {
+                 if (e.repeat) return;
+                 if (e.code !== 'Space' && e.code !== 'ArrowUp') return;
+            }
             
             if (gameover) {
                 resetGame();
@@ -224,17 +228,16 @@
         function resetGame() {
             gameover = false;
             score = 0;
-            gameSpeed = 5;
+            gameSpeed = 6;
             frame = 0;
             obstacles.length = 0;
             instructions.style.display = "block";
+            instructions.innerText = "PRESS SPACE TO JUMP";
             animate();
         }
 
-        // Event Listeners
         window.addEventListener('keydown', inputAction);
         window.addEventListener('touchstart', (e) => {
-            // Mobile Touch Logic
             if (gameover) {
                 resetGame();
             } else {
@@ -242,7 +245,6 @@
             }
         }, {passive: false});
 
-        // Start the game loop
         animate();
 
     </script>
