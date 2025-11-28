@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#f7f7f7">
-    <title>Wine Farmer - Optimized</title>
+    <title>Wine Farmer - Fixed</title>
     <style>
         body {
             margin: 0;
@@ -12,7 +12,7 @@
             overflow: hidden;
             background-color: #f7f7f7; 
             font-family: 'Courier New', Courier, monospace; 
-            touch-action: none; 
+            touch-action: none; /* Critical for mobile responsiveness */
             -webkit-user-select: none; 
             user-select: none;
             -webkit-tap-highlight-color: transparent;
@@ -52,7 +52,7 @@
 <body>
 
     <div id="ui-layer">
-        <div id="start-msg" class="retro-text blink">TAP TO START</div>
+        <div id="start-msg" class="retro-text blink">TAP OR SPACE TO START</div>
         <div id="game-over-msg" class="retro-text" style="display:none;">
             GAME OVER<br>
             <span style="font-size:16px; display:block; margin-top:15px;">TAP TO RETRY</span>
@@ -63,7 +63,7 @@
 
     <script>
         const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d', { alpha: false }); // Optimization: Disable alpha if not needed for background
+        const ctx = canvas.getContext('2d'); // Standard context
         const startMsg = document.getElementById('start-msg');
         const gameOverMsg = document.getElementById('game-over-msg');
 
@@ -72,28 +72,26 @@
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            // Scale graphics slightly on larger screens so it doesn't look tiny
             scaleRatio = Math.min(canvas.width / 400, 1.5); 
         }
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
         // === GAME VARIABLES ===
-        let gameSpeed = 350; // Pixels per second
+        let gameSpeed = 350; 
         let score = 0;
         let gameover = false;
         let running = false; 
         
         // Physics
-        // Gravity needs to be strong enough to pull down quickly
         const gravity = 2500; 
         const jumpStrength = 850; 
         
         // Input Logic
-        let jumpBuffer = 0; // Remembers jump press for a split second
-        let isHoldingJump = false; // Tracks if user is holding the button
+        let jumpBuffer = 0; 
+        let isHoldingJump = false; 
 
-        // Time Management (The Smoothness Fix)
+        // Time Management
         let lastTime = 0;
 
         // Player Character
@@ -108,19 +106,13 @@
             
             draw: function() {
                 ctx.font = `${46 * scaleRatio}px Arial`; 
-                // Draw relative to scaled size
                 ctx.fillText(this.emoji, this.x, this.y + (this.height * scaleRatio));
-                
-                // Debug Hitbox (Uncomment to see collision box)
-                // ctx.strokeStyle = "red"; ctx.strokeRect(this.x, this.y, this.width * scaleRatio, this.height * scaleRatio);
             },
             
             update: function(dt) {
-                // Apply Gravity
                 this.dy += gravity * dt;
                 this.y += this.dy * dt;
 
-                // Ground Detection
                 let groundLevel = canvas.height - (30 * scaleRatio) - (this.height * scaleRatio);
                 
                 if (this.y > groundLevel) {
@@ -131,17 +123,14 @@
                     this.grounded = false;
                 }
 
-                // === JUMP LOGIC ===
-                // Buffer Check: Execute jump if buffered and grounded
                 if (jumpBuffer > 0 && this.grounded) {
                     this.jump();
                     jumpBuffer = 0; 
                 }
 
-                // Variable Jump Height:
-                // If moving up (jumping) AND not holding button, cut upward momentum
+                // Variable Jump Height logic
                 if (this.dy < 0 && !isHoldingJump) {
-                    this.dy += gravity * dt * 1.5; // Apply extra gravity to cut jump short
+                    this.dy += gravity * dt * 2.0; 
                 }
             },
             
@@ -159,7 +148,6 @@
                 this.w = 25;
                 this.h = 40;
                 this.x = canvas.width;
-                // Place on ground
                 this.y = canvas.height - (30 * scaleRatio) - (this.h * scaleRatio);
                 this.emoji = "🍷";
                 this.passed = false;
@@ -168,10 +156,7 @@
             draw() {
                 ctx.font = `${36 * scaleRatio}px Arial`;
                 ctx.fillText(this.emoji, this.x, this.y + (this.h * scaleRatio));
-                
-                // Debug Hitbox
-                // ctx.strokeStyle = "blue"; ctx.strokeRect(this.x, this.y, this.w * scaleRatio, this.h * scaleRatio);
-            },
+            }
 
             update(dt) {
                 this.x -= gameSpeed * dt;
@@ -180,33 +165,27 @@
 
         // === GAME LOOP ===
         let obstacleTimer = 0;
-        let obstacleInterval = 1.8; // Seconds between obstacles
+        let obstacleInterval = 1.8; 
 
         function update(dt) {
             player.update(dt);
 
-            // Obstacle Spawning
             obstacleTimer -= dt;
             if (obstacleTimer <= 0) {
                 obstacles.push(new Obstacle());
-                // Randomize next spawn slightly
                 obstacleInterval = (Math.random() * 0.5) + (1100 / gameSpeed); 
                 obstacleTimer = obstacleInterval;
             }
 
-            // Obstacle Logic
             for (let i = 0; i < obstacles.length; i++) {
                 let obs = obstacles[i];
                 obs.update(dt);
                 obs.draw();
 
-                // Hitbox Calculation (Scaled)
                 let pW = player.width * scaleRatio;
                 let pH = player.height * scaleRatio;
                 let oW = obs.w * scaleRatio;
                 let oH = obs.h * scaleRatio;
-
-                // Forgiving Collision (Shrink hitbox slightly for fairness)
                 let hitMargin = 10 * scaleRatio; 
 
                 if (
@@ -218,29 +197,23 @@
                     endGame();
                 }
 
-                // Scoring
                 if (!obs.passed && obs.x + oW < player.x) {
                     score += 25; 
                     obs.passed = true;
-                    // Increase speed capping at 900
                     if(gameSpeed < 900) gameSpeed += 10; 
                 }
 
-                // Cleanup
                 if (obs.x + oW < 0) {
                     obstacles.splice(i, 1);
                     i--;
                 }
             }
 
-            // Decrease Buffer timer (Time based now, not frame based)
             if (jumpBuffer > 0) jumpBuffer -= dt;
         }
 
         function draw() {
-            // Draw Background
-            ctx.fillStyle = "#f7f7f7";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Standard clear
             
             // Draw Ground
             ctx.beginPath();
@@ -264,8 +237,6 @@
         function animate(timestamp) {
             if (!running) return;
 
-            // Calculate Delta Time (in seconds)
-            // Cap it at 0.1s to prevent huge jumps if browser tab hangs
             let dt = (timestamp - lastTime) / 1000;
             if (dt > 0.1) dt = 0.1; 
             lastTime = timestamp;
@@ -277,13 +248,12 @@
             }
         }
 
-        // === STATE MANAGEMENT ===
         function startGame() {
             if (!running) {
                 running = true;
                 startMsg.style.display = 'none';
                 lastTime = performance.now();
-                animate(performance.now());
+                requestAnimationFrame(animate);
             }
         }
 
@@ -305,20 +275,25 @@
             player.grounded = true;
             
             lastTime = performance.now();
-            animate(performance.now());
+            requestAnimationFrame(animate);
         }
 
-        // === INPUT HANDLER ===
-        function handleStart(e) {
-            if(e.type === 'touchstart') e.preventDefault(); 
-            if(e.type === 'keydown' && e.code !== 'Space' && e.code !== 'ArrowUp') return;
-            if(e.type === 'keydown') e.preventDefault();
+        // === ROBUST INPUT HANDLER ===
+        
+        function handleInputStart(e) {
+            // Ignore if we are just moving mouse around
+            if (e.type === 'keydown' && e.code !== 'Space' && e.code !== 'ArrowUp') return;
+            
+            // Prevent default behavior (scrolling) for relevant keys/touches
+            if (e.cancelable && (e.code === 'Space' || e.code === 'ArrowUp' || e.type === 'touchstart' || e.type === 'pointerdown')) {
+                e.preventDefault();
+            }
 
             isHoldingJump = true;
 
             if (!running) {
                 startGame();
-                jumpBuffer = 0.2; // 0.2 seconds buffer
+                jumpBuffer = 0.2;
             } else if (gameover) {
                 resetGame();
             } else {
@@ -326,27 +301,22 @@
             }
         }
 
-        function handleEnd(e) {
-            if(e.type === 'touchend') e.preventDefault();
-            if(e.type === 'keyup' && e.code !== 'Space' && e.code !== 'ArrowUp') return;
-            
+        function handleInputEnd(e) {
             isHoldingJump = false;
         }
 
-        document.addEventListener('keydown', handleStart);
-        document.addEventListener('keyup', handleEnd);
-        document.addEventListener('touchstart', handleStart, {passive: false});
-        document.addEventListener('touchend', handleEnd, {passive: false});
+        // Keyboard
+        document.addEventListener('keydown', handleInputStart);
+        document.addEventListener('keyup', handleInputEnd);
+        
+        // Pointer (Mouse + Touch combined)
+        // 'pointerdown' works for Mouse clicks AND Touch taps
+        document.addEventListener('pointerdown', handleInputStart);
+        document.addEventListener('pointerup', handleInputEnd);
 
-        // Initial Draw
-        ctx.fillStyle = "#f7f7f7";
-        ctx.fillRect(0,0,canvas.width, canvas.height);
-        // Fake draw to show character before start
-        ctx.fillStyle = "#333";
-        ctx.beginPath();
-        ctx.moveTo(0, canvas.height - 30);
-        ctx.lineTo(canvas.width, canvas.height - 30);
-        ctx.stroke();
+        // Initial Render
+        draw();
+
     </script>
 </body>
 </html>
