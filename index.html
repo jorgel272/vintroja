@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Wine Farmer - Smooth Retro</title>
+    <title>Wine Farmer - Fast Retro</title>
     <style>
         body {
             margin: 0;
@@ -11,13 +11,14 @@
             overflow: hidden;
             background-color: #f7f7f7; 
             font-family: 'Courier New', Courier, monospace; 
-            touch-action: none;
+            touch-action: none; /* Critical for mobile responsiveness */
             -webkit-user-select: none; 
             user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
         canvas {
             display: block;
-            /* Retro B&W Filter: Turns emojis into solid black sprites */
+            /* Retro Filter: Makes emojis look like solid black pixels */
             filter: grayscale(100%) contrast(500%); 
         }
         #ui-layer {
@@ -28,17 +29,18 @@
             text-align: center;
             pointer-events: none;
             width: 100%;
+            z-index: 10;
         }
         .retro-text {
             color: #535353;
-            font-size: 20px;
+            font-size: 24px;
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 3px;
             margin-bottom: 10px;
         }
         .blink {
-            animation: blinker 1.5s linear infinite;
+            animation: blinker 1s step-end infinite;
         }
         @keyframes blinker {
             50% { opacity: 0; }
@@ -48,10 +50,10 @@
 <body>
 
     <div id="ui-layer">
-        <div id="start-msg" class="retro-text blink">PRESS SPACE OR TAP TO START</div>
+        <div id="start-msg" class="retro-text blink">PRESS SPACE</div>
         <div id="game-over-msg" class="retro-text" style="display:none;">
             GAME OVER<br>
-            <span style="font-size:14px; display:block; margin-top:15px;">TAP TO RESTART</span>
+            <span style="font-size:16px; display:block; margin-top:15px;">TAP TO RETRY</span>
         </div>
     </div>
     
@@ -63,17 +65,18 @@
         const startMsg = document.getElementById('start-msg');
         const gameOverMsg = document.getElementById('game-over-msg');
 
-        // Game State
-        let gameSpeed = 6; 
+        // Game Configuration
+        let gameSpeed = 7; 
         let score = 0;
         let gameover = false;
         let running = false; 
         let frame = 0;
         
-        // PHYSICS TUNING FOR SMOOTHNESS
-        // Lower gravity + moderate jump strength = Smooth Arc
-        const gravity = 0.6; 
-        const jumpStrength = 12; 
+        // PHYSICS ENGINE v3 (Responsive / Athletic)
+        // Higher Gravity (1.2) makes the fall faster (less floaty)
+        // High Jump (19) makes the takeoff instant
+        const gravity = 1.2; 
+        const jumpStrength = 19; 
 
         function resizeCanvas() {
             canvas.width = window.innerWidth;
@@ -82,7 +85,7 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Player Object
+        // Player Character
         const player = {
             x: 50,
             y: 0, 
@@ -94,17 +97,15 @@
             draw: function() {
                 ctx.font = "46px Arial"; 
                 ctx.fillText(this.emoji, this.x, this.y + this.height);
-                // Hitbox visualizer (for debugging)
-                // ctx.lineWidth = 1; ctx.strokeStyle = "black"; ctx.strokeRect(this.x, this.y, this.width, this.height);
             },
             update: function() {
-                // Apply Gravity
+                // Apply physics
                 if (!this.grounded) {
                     this.dy += gravity;
                     this.y += this.dy;
                 }
 
-                // Ground Collision
+                // Ground Logic
                 if (this.y + this.height > canvas.height - 30) {
                     this.y = canvas.height - 30 - this.height;
                     this.dy = 0;
@@ -149,8 +150,7 @@
 
         function handleObstacles() {
             // Spawn Logic
-            // Spawns roughly every 100-120 frames depending on speed
-            let spawnRate = Math.floor(1200 / gameSpeed);
+            let spawnRate = Math.floor(1100 / gameSpeed);
             if (frame % spawnRate === 0) {
                 obstacles.push(new Obstacle());
             }
@@ -160,7 +160,7 @@
                 obs.update();
 
                 // Collision Detection
-                // Using a generous hitbox buffer (15px/10px) so the game feels fair
+                // (Hitbox tweaked to be slightly forgiving)
                 if (
                     player.x + 15 < obs.x + obs.width &&
                     player.x + player.width - 10 > obs.x &&
@@ -170,18 +170,18 @@
                     endGame();
                 }
 
-                // Scoring: 25 Points per jump
+                // Scoring: 25 Points EXACTLY
                 if (!obs.passed && obs.x + obs.width < player.x) {
                     score += 25; 
                     obs.passed = true;
                     
-                    // Gentle speed increase cap at 15
-                    if(gameSpeed < 15) { 
-                        gameSpeed += 0.15; 
+                    // Cap max speed so it doesn't become unplayable
+                    if(gameSpeed < 18) { 
+                        gameSpeed += 0.2; 
                     }
                 }
 
-                // Clean up
+                // Remove off-screen items
                 if (obs.x + obs.width < 0) {
                     obstacles.splice(i, 1);
                     i--;
@@ -194,7 +194,7 @@
             ctx.moveTo(0, canvas.height - 30);
             ctx.lineTo(canvas.width, canvas.height - 30);
             ctx.strokeStyle = "#535353";
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 2;
             ctx.stroke();
         }
 
@@ -203,7 +203,7 @@
             ctx.font = "bold 24px 'Courier New'";
             ctx.textAlign = "right";
             
-            // 5-digit score format (e.g., 00025)
+            // Score formatting 00025
             let formattedScore = score.toString().padStart(5, '0');
             ctx.fillText(formattedScore, canvas.width - 20, 40);
             
@@ -225,7 +225,7 @@
             requestAnimationFrame(animate);
         }
 
-        // Game Control
+        // Game Logic
         function startGame() {
             if (!running) {
                 running = true;
@@ -242,22 +242,28 @@
         function resetGame() {
             gameover = false;
             score = 0;
-            gameSpeed = 6;
+            gameSpeed = 7;
             frame = 0;
             obstacles.length = 0;
             gameOverMsg.style.display = 'none';
             
-            // Reset player pos
             player.y = canvas.height - 30 - player.height;
             player.dy = 0;
+            player.grounded = true;
             
             animate();
         }
 
-        // Input Handling
+        // Input Handler
         function handleInput(e) {
-            if (e.type === 'keydown' && e.code !== 'Space' && e.code !== 'ArrowUp') return;
-            if (e.type === 'touchstart') e.preventDefault(); // Stop browser zoom/scroll
+            // Filter keys
+            if (e.type === 'keydown') {
+                if (e.code !== 'Space' && e.code !== 'ArrowUp') return;
+                e.preventDefault(); // PREVENT SCROLLING/BROWSER LAG
+            }
+            if (e.type === 'touchstart') {
+                e.preventDefault(); // PREVENT ZOOM/DELAY
+            }
 
             if (!running) {
                 startGame();
@@ -269,10 +275,11 @@
             }
         }
 
-        window.addEventListener('keydown', handleInput);
-        window.addEventListener('touchstart', handleInput, {passive: false});
+        // Listeners
+        document.addEventListener('keydown', handleInput);
+        document.addEventListener('touchstart', handleInput, {passive: false});
 
-        // Initial Static Render (So the screen isn't blank on load)
+        // Initial Render
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         drawGround();
         player.y = canvas.height - 30 - player.height;
