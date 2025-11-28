@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Wine Farmer - Fast Retro</title>
+    <title>Wine Farmer - Smooth & Responsive</title>
     <style>
         body {
             margin: 0;
@@ -11,14 +11,14 @@
             overflow: hidden;
             background-color: #f7f7f7; 
             font-family: 'Courier New', Courier, monospace; 
-            touch-action: none; /* Critical for mobile responsiveness */
+            touch-action: none; 
             -webkit-user-select: none; 
             user-select: none;
             -webkit-tap-highlight-color: transparent;
         }
         canvas {
             display: block;
-            /* Retro Filter: Makes emojis look like solid black pixels */
+            /* Keeps the Retro Black & White look */
             filter: grayscale(100%) contrast(500%); 
         }
         #ui-layer {
@@ -72,11 +72,13 @@
         let running = false; 
         let frame = 0;
         
-        // PHYSICS ENGINE v3 (Responsive / Athletic)
-        // Higher Gravity (1.2) makes the fall faster (less floaty)
-        // High Jump (19) makes the takeoff instant
-        const gravity = 1.2; 
-        const jumpStrength = 19; 
+        // === INPUT BUFFERING ===
+        // This is the magic fix. We store the jump command for a few frames.
+        let jumpBuffer = 0; 
+
+        // Physics
+        const gravity = 1.5; 
+        const jumpStrength = 20; 
 
         function resizeCanvas() {
             canvas.width = window.innerWidth;
@@ -99,13 +101,13 @@
                 ctx.fillText(this.emoji, this.x, this.y + this.height);
             },
             update: function() {
-                // Apply physics
+                // Apply Gravity
                 if (!this.grounded) {
                     this.dy += gravity;
                     this.y += this.dy;
                 }
 
-                // Ground Logic
+                // Ground Detection
                 if (this.y + this.height > canvas.height - 30) {
                     this.y = canvas.height - 30 - this.height;
                     this.dy = 0;
@@ -114,13 +116,18 @@
                     this.grounded = false;
                 }
 
+                // === JUMP LOGIC ===
+                // Check if we have a buffered jump command waiting AND we are on the ground
+                if (jumpBuffer > 0 && this.grounded) {
+                    this.jump();
+                    jumpBuffer = 0; // Use up the buffer
+                }
+
                 this.draw();
             },
             jump: function() {
-                if (this.grounded) {
-                    this.dy = -jumpStrength;
-                    this.grounded = false;
-                }
+                this.dy = -jumpStrength;
+                this.grounded = false;
             }
         };
 
@@ -149,7 +156,6 @@
         }
 
         function handleObstacles() {
-            // Spawn Logic
             let spawnRate = Math.floor(1100 / gameSpeed);
             if (frame % spawnRate === 0) {
                 obstacles.push(new Obstacle());
@@ -159,8 +165,7 @@
                 let obs = obstacles[i];
                 obs.update();
 
-                // Collision Detection
-                // (Hitbox tweaked to be slightly forgiving)
+                // Collision
                 if (
                     player.x + 15 < obs.x + obs.width &&
                     player.x + player.width - 10 > obs.x &&
@@ -170,18 +175,13 @@
                     endGame();
                 }
 
-                // Scoring: 25 Points EXACTLY
+                // Scoring: 25 Points
                 if (!obs.passed && obs.x + obs.width < player.x) {
                     score += 25; 
                     obs.passed = true;
-                    
-                    // Cap max speed so it doesn't become unplayable
-                    if(gameSpeed < 18) { 
-                        gameSpeed += 0.2; 
-                    }
+                    if(gameSpeed < 18) gameSpeed += 0.2; 
                 }
 
-                // Remove off-screen items
                 if (obs.x + obs.width < 0) {
                     obstacles.splice(i, 1);
                     i--;
@@ -202,17 +202,17 @@
             ctx.fillStyle = "#535353";
             ctx.font = "bold 24px 'Courier New'";
             ctx.textAlign = "right";
-            
-            // Score formatting 00025
             let formattedScore = score.toString().padStart(5, '0');
             ctx.fillText(formattedScore, canvas.width - 20, 40);
-            
             ctx.textAlign = "left"; 
         }
 
         function animate() {
             if (!running) return;
             if (gameover) return;
+
+            // Decrease Jump Buffer timer every frame
+            if (jumpBuffer > 0) jumpBuffer--;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
@@ -225,7 +225,6 @@
             requestAnimationFrame(animate);
         }
 
-        // Game Logic
         function startGame() {
             if (!running) {
                 running = true;
@@ -254,28 +253,34 @@
             animate();
         }
 
-        // Input Handler
         function handleInput(e) {
-            // Filter keys
-            if (e.type === 'keydown') {
-                if (e.code !== 'Space' && e.code !== 'ArrowUp') return;
-                e.preventDefault(); // PREVENT SCROLLING/BROWSER LAG
+            // Logic for both Touch and Keyboard
+            let isJumpAction = false;
+
+            if (e.type === 'keydown' && (e.code === 'Space' || e.code === 'ArrowUp')) {
+                isJumpAction = true;
+                e.preventDefault(); // Prevents scrolling lag
             }
             if (e.type === 'touchstart') {
-                e.preventDefault(); // PREVENT ZOOM/DELAY
+                isJumpAction = true;
+                e.preventDefault(); // Prevents touch lag
             }
+
+            if (!isJumpAction) return;
 
             if (!running) {
                 startGame();
-                player.jump();
+                // Initial jump
+                jumpBuffer = 10;
             } else if (gameover) {
                 resetGame();
             } else {
-                player.jump();
+                // INSTEAD OF JUMPING DIRECTLY, WE BUFFER THE INPUT
+                // This means: "The player wants to jump. Remember this for 10 frames."
+                jumpBuffer = 10; 
             }
         }
 
-        // Listeners
         document.addEventListener('keydown', handleInput);
         document.addEventListener('touchstart', handleInput, {passive: false});
 
